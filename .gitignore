@@ -1,0 +1,8 @@
+.DS_Store
+/target/
+/artifacts/
+.env
+.env.*
+!.env.example
+/config.local.*
+/.opencode/node_modules/
