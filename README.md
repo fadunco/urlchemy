@@ -15,10 +15,15 @@ Read [the harness guide](docs/harness.md), then run:
 
 ```sh
 sh scripts/doctor.sh
+sh scripts/test-doctor.sh
 ```
 
 The project includes OpenCode V2 configuration, project instructions, skills and `/check`, `/review`, `/prepare-pr` commands. General Rust/GitHub skills can also be installed globally using `sh scripts/install-global-skills.sh`.
 
+The maintainer also uses global **Superpowers** and **find-skills**. See [the toolkit guide](docs/agent-toolkit.md) for installation, pinned versions, update ownership and project-specific approval rules. A clone does not install these global tools automatically.
+
 Framework skills are checked in as a reviewed snapshot. Use `scripts/install-gpui-skills.sh` only when bootstrapping a copy missing those skills, not to update an existing installation.
+
+A temporary keyboard/focus and Metal screenshot experiment established a working agent-testing path; see [the testing probe report](docs/testing-probe.md). The experiment did not scaffold the application.
 
 Repository: [fadunco/urlchemy](https://github.com/fadunco/urlchemy). Commits and remote mutations require explicit maintainer approval; see `AGENTS.md`.

@@ -6,16 +6,16 @@
 - **Rust + GPUI + GPUI Kit** as the initial desktop UI direction, not yet an application dependency selection.
 - Official `gpui-kit` and `gpui-kit-design-guides` skills installed project-locally at the revision in `THIRD_PARTY_NOTICES.md`.
 - Project-owned `rust-development` and `github-workflow` skills, also available for optional global installation.
-- No MCP servers, third-party executable plugins, or automatic multi-agent orchestration.
+- No MCP servers. The maintainer subsequently requested global Superpowers and find-skills; see [the toolkit integration guide](agent-toolkit.md). Multi-agent execution still requires approval for the task/plan.
 - The initial harness setup did not scaffold the application or publish anything. The maintainer subsequently approved initializing Git and publishing the harness to the public `fadunco/urlchemy` repository under MIT.
 
-The two general skills are versioned in this project, so contributors do not need the global copies. The global installer copies only these two skills and refuses to replace different existing files. Project skills take precedence in V2. Global OpenCode configuration and provider credentials are unchanged.
+The two general skills are versioned in this project, so contributors do not need the global copies. The global installer copies only these two skills and refuses to replace different existing files. Project skills take precedence in V2. Global OpenCode configuration now includes the explicitly requested Superpowers plugin and global workflow instructions; provider settings and credentials are unchanged.
 
 ## Why these choices
 
 GPUI is the UI framework behind Zed and has a longer real-application track record. GPUI Kit adds components and first-party-maintained agent guidance. Both remain evolving APIs: compile against a chosen compatible version, rather than relying on generic GPUI examples. The future application's Rust version and dependencies still need to be selected and pinned.
 
-Rune is a credible alternative, particularly for agents: its current documentation provides PNG snapshots, element/accessibility trees, scripted keyboard input, global-shortcut simulation and launcher window support. It is explicitly pre-release and requires a pinned revision and matching patches. We have not built or benchmarked either framework here. Prefer GPUI initially for the maintainer's maturity criterion, not because Rune lacks agent tooling.
+Rune is a credible alternative, particularly for agents: its current documentation provides PNG snapshots, element/accessibility trees, scripted keyboard input, global-shortcut simulation and launcher window support. It is explicitly pre-release and requires a pinned revision and matching patches. We have built and manually checked a minimal GPUI Kit window, but have not built Rune or benchmarked either framework. Prefer GPUI initially for the maintainer's maturity criterion, not because Rune lacks agent tooling.
 
 Sources checked during setup:
 
@@ -28,15 +28,17 @@ Sources checked during setup:
 - https://opencode.ai/docs/permissions
 - https://opencode.ai/docs/commands
 
-Superpowers was evaluated (https://github.com/obra/superpowers). It offers a comprehensive methodology, but introduces mandatory workflows/bootstrap injection and optional subagent-driven execution. It is intentionally not installed: a small set of explicit skills is a better starting baseline here. General frontend/web design skills and Playwright were not installed because this UI is native, not a browser DOM.
+The initial lean setup did not install Superpowers. The maintainer later explicitly requested it as the general process toolkit, plus Vercel's Skills CLI and find-skills. They are now installed globally at reviewed revisions, with approval/preservation exceptions in AGENTS.md. They complement rather than replace the GPUI/Rust technical skills. The maintainer also requested global ASD-STE100 writing guidance, documented in the toolkit guide. General frontend/web design skills and Playwright remain unnecessary for this native UI.
 
 ## Machine prerequisites
 
-Run `sh scripts/doctor.sh` from the repository root. A nonzero exit identifies outstanding prerequisites; it is not a failed application test.
+Run `sh scripts/doctor.sh` from the repository root. A nonzero exit identifies outstanding prerequisites; it is not a failed application test. Metal is checked by executing `xcrun metal --version`, not merely finding its path: Xcode can expose a shim even when the optional toolchain is missing.
+
+Run `sh scripts/test-doctor.sh` to exercise the diagnostic against local command stubs. It checks a healthy environment, a discoverable-but-unusable Metal compiler, and a legacy OpenCode CLI. These tests do not use real credentials, install software or access the network.
 
 ### OpenCode CLI mismatch
 
-At setup, `/Applications/OpenCode.app` and its bundled CLI are **2.2.7**, while `opencode` on PATH is **1.19.5**. The global config contains only the schema declaration. The existing global package.json references the V1 plugin SDK; leave it alone unless a migration is explicitly requested. No plugin is being installed here.
+At setup, `/Applications/OpenCode.app` and its bundled CLI are **2.2.7**, while `opencode` on PATH is **1.19.5**. The global config initially contained only the schema declaration; it now also pins Superpowers under V2's `plugins` field. The existing global package.json references the V1 plugin SDK; it was not modified and should be left alone unless a migration is explicitly requested.
 
 Use the V2 CLI without replacing the old binary:
 
@@ -68,15 +70,21 @@ Agents may use `$HOME/.cargo/bin/cargo` directly. The project's rustfmt command 
 
 ### Xcode / Metal
 
-The initial machine has Command Line Tools selected, not full Xcode. GPUI's documented macOS setup requires Xcode and Metal tooling. Install Xcode from Apple, launch it and complete the macOS component/license setup. Then select the actual installation, for example:
+The initial machine had only Command Line Tools selected. Xcode 27.2 and the Metal Toolchain are now installed and selected. For another contributor's machine, GPUI's documented macOS setup requires Xcode and Metal tooling. Install Xcode from Apple, launch it and complete the macOS component/license setup. Then select the actual installation, for example:
 
 ```sh
 sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
 xcodebuild -version
-xcrun --find metal
+xcrun metal --version
 ```
 
-These are manual instructions, not commands the agent should run without approval. Command Line Tools alone are not proof that GPUI can compile.
+If the compiler reports a missing Metal Toolchain, install the component explicitly:
+
+```sh
+xcodebuild -downloadComponent MetalToolchain
+```
+
+These are manual instructions, not commands the agent should run without approval. Command Line Tools alone, or a successful `xcrun --find metal`, are not proof that the compiler can execute. Setup verification also compiled a minimal shader to AIR and linked it into a Metal library.
 
 ### GitHub
 
@@ -92,10 +100,10 @@ Do not share tokens in chat. The authenticated owner is `fadunco`; the maintaine
 
 ## Working loop
 
-1. Agree on a small task and acceptance criteria.
-2. Load relevant skills; verify the selected framework API against source.
-3. Add focused tests and implement a small change.
-4. Run `/check`; use `/review` for a non-editing review. Commands stay in the current session, with no automatic subagents.
+1. Agree on a small task, acceptance criteria, proportionate design/plan and execution mode using the relevant Superpowers process skills.
+2. Load domain skills and verify the selected framework API against source. Use find-skills only when another capability is genuinely missing; further installations need approval.
+3. Follow test-first for production changes and implement a small change; keep disposable exploration separate from product implementation.
+4. Run `/check`; use `/review` for a non-editing, in-session review. An independent reviewer or subagent-driven plan needs explicit delegation approval; do not claim self-review is independent.
 5. Use `/prepare-pr` to draft a PR description without publishing.
 6. The user approves commits and remote mutations explicitly.
 
@@ -113,18 +121,25 @@ Do not create a fake CI workflow or green application-test claim while Cargo.tom
 
 For the native launcher, eventually verify activation/repeated summon, focus restoration, global shortcuts and conflicts, Escape/Enter/arrow routing, keyboard layouts/IME, multiple displays, Spaces/fullscreen and VoiceOver. Headless tests cannot prove OS integration. Opening URLs must be mockable; tests should not launch real browser sessions or access private configuration.
 
+### Verified agent-testing path
+
+A separate temporary GPUI Kit 0.9.1 probe passed three UI integration tests for input, filtering, keyboard/focus and negative cases, plus a real-Metal offscreen screenshot check. See [the testing probe report](testing-probe.md) for evidence, exact scope, scheduling rules and an accessibility limitation discovered in the published Command component. The fixture and PNGs remain outside this repository; these are framework experiments, not URLchemy application tests.
+
 ## Updating and removal
 
 - Review upstream changes before updating the framework skill revision and notices. The installer refuses existing skill directories rather than overwriting work.
 - Global copies are independent snapshots. Updates require review if files differ; deleting or renaming project files does not silently change global behavior.
 - To undo global skills, inspect and remove only `~/.config/opencode/skills/rust-development/` and `github-workflow/` if they still contain the copies installed here. Do not remove unrelated skills, SDK packages, OpenCode state or credentials.
 
-## Setup verification (2026-11-12)
+## Initial setup and subsequent verification (2026-11-12)
 
 - Installed Rust stable **1.100.0**, rustfmt and clippy via rustup, without editing PATH or shell profiles.
-- Installed GitHub CLI **2.104.0** through Homebrew. GitHub is not authenticated yet.
+- Installed GitHub CLI **2.104.0** through Homebrew. The user subsequently authenticated as `fadunco`.
 - V2 CLI `debug config` successfully discovered and parsed the project configuration, including expanded rustfmt path and permission rules.
 - The running OpenCode service reports **2.2.7**. All four installed skills appeared in this session's skill catalog.
 - `sh -n` passed for the three setup/diagnostic scripts. Both installed upstream skill directories matched the reviewed checkout exactly (`diff -rq`).
-- Doctor verified the Rust tools and skill files. Outstanding prerequisites: GitHub sign-in and full Xcode/Metal. Default PATH still selects the V1 CLI; the bundled V2 CLI works explicitly.
-- No application build, Rust tests or native UI checks ran: there is no Cargo workspace yet. No git repository, commits or remote resources were created.
+- Doctor now passes with the bundled V2 CLI: Rust tools, GitHub sign-in, Xcode **27.2**, actual Metal compiler execution, and skill files. Default PATH still selects the V1 CLI; the bundled V2 CLI works explicitly.
+- A separate temporary project with **GPUI Kit 0.9.1**, its default component/assets features, and a generated Cargo.lock passed `cargo build --locked`, rustfmt and clippy with warnings denied. It produced an ARM64 executable. This did not create a Cargo workspace in URLchemy.
+- The user approved launching that temporary native window, confirmed the rendered text/button, and closed it using the button. The process exited without an error. This verifies a minimal native surface and click/quit path, not global shortcuts or launcher behavior.
+- Git was subsequently initialized and the initial harness commit published to public `fadunco/urlchemy` with explicit approval. Later preparation edits remain subject to separate commit/push approval.
+- The doctor regression test first reproduced the Metal false-positive, then passed all three stubbed scenarios after the execution check was fixed.
