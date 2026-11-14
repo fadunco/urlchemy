@@ -6,6 +6,9 @@ A lightweight, keyboard-driven URL launcher for macOS. Navigate complex web appl
 
 Initial UI direction: Rust + GPUI + GPUI Kit. This is an open-source project under the MIT license, with third-party material under its own licenses.
 
+The working [product definition](docs/product.md) records agreed functional decisions and open questions.
+See the [roadmap](ROADMAP.md) for the proposed sequence from domain design to a verified MVP.
+
 ## Agent development setup
 
 Read [the harness guide](docs/harness.md), then run:
