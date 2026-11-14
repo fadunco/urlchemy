@@ -34,7 +34,9 @@ check 'clippy' "$cargo" clippy --version
 printf '\nSelected developer directory:\n'
 check 'Xcode developer directory selection' xcode-select -p
 check 'full Xcode (not only Command Line Tools)' xcodebuild -version
-check 'Metal compiler' xcrun --find metal
+# Xcode can expose a metal shim before the optional toolchain is installed.
+# Finding the path alone is not evidence that the compiler can execute.
+check 'Metal compiler execution' xcrun metal --version
 
 opencode=${OPENCODE_BIN:-opencode}
 printf '\nOpenCode (project configuration requires V2):\n'
