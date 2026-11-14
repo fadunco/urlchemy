@@ -1,0 +1,21 @@
+navigation:
+  - flow:
+      id: environment-application
+      label: Open environment application
+      baseURL: https://idp.example.com/company
+      start:
+        select:
+          label: Environment
+          capture: environment
+          options:
+            - label: Staging
+              value: staging
+            - label: Production
+              value: production
+          next:
+            input:
+              label: Application
+              capture: application
+              next:
+                destination:
+                  template: "/{environment}/application/{application}"

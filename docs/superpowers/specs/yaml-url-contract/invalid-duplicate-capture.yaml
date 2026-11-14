@@ -1,0 +1,16 @@
+navigation:
+  - flow:
+      id: duplicate-capture
+      label: Example
+      baseURL: https://example.com
+      start:
+        input:
+          label: First application
+          capture: application
+          next:
+            input:
+              label: Second application
+              capture: application
+              next:
+                destination:
+                  template: "/{application}"

@@ -1,0 +1,9 @@
+navigation:
+  - flow:
+      id: unknown-field
+      label: Example
+      baseUrl: https://example.com
+      baseURL: https://example.com
+      start:
+        destination:
+          template: "/"

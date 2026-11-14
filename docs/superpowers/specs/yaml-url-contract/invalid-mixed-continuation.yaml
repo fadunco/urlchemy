@@ -1,0 +1,16 @@
+navigation:
+  - flow:
+      id: mixed-continuation
+      label: Example
+      baseURL: https://example.com
+      start:
+        select:
+          label: Destination
+          options:
+            - label: Branch destination
+              next:
+                destination:
+                  template: "/branch"
+          next:
+            destination:
+              template: "/common"

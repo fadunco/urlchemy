@@ -1,0 +1,12 @@
+navigation:
+  - flow:
+      id: invalid-template
+      label: Example
+      baseURL: https://example.com
+      start:
+        input:
+          label: Application
+          capture: application
+          next:
+            destination:
+              template: "/{application"

@@ -1,0 +1,10 @@
+navigation:
+  - flow:
+      id: missing-continuation
+      label: Example
+      baseURL: https://example.com
+      start:
+        select:
+          label: Destination
+          options:
+            - label: Missing destination

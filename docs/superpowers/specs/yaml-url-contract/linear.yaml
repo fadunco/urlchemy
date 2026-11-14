@@ -1,0 +1,21 @@
+navigation:
+  - flow:
+      id: open-application
+      label: Open application section
+      baseURL: https://idp.example.com/company
+      start:
+        input:
+          label: Section
+          capture: app-section
+          suggestions:
+            - label: Jobs
+              value: jobs
+            - label: Databases
+              value: databases
+          next:
+            input:
+              label: Application
+              capture: app-name
+              next:
+                destination:
+                  template: "/engineering/application/{app-name}/{app-section}?owner={app-name}&owner=backup"

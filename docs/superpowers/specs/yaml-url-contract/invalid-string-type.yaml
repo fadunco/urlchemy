@@ -1,0 +1,15 @@
+navigation:
+  - flow:
+      id: numeric-value
+      label: Example
+      baseURL: https://example.com
+      start:
+        select:
+          label: Identifier
+          capture: identifier
+          options:
+            - label: Numeric identifier
+              value: 123
+          next:
+            destination:
+              template: "/{identifier}"

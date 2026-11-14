@@ -1,0 +1,14 @@
+navigation:
+  - flow:
+      id: noncapturing-value
+      label: Example
+      baseURL: https://example.com
+      start:
+        select:
+          label: Destination
+          options:
+            - label: Overview
+              value: overview
+          next:
+            destination:
+              template: "/overview"
