@@ -3,7 +3,7 @@
 ## Scope and communication
 
 - URLchemy is a lightweight, keyboard-driven macOS URL launcher, configured through local files. It builds URLs interactively rather than navigating web-app menus.
-- Current scope is harness setup, not application implementation. Do not scaffold the application until asked.
+- Current scope is the tested UI-independent core. Native UI and macOS integration require an explicit request.
 - Discuss decisions with the maintainer in Spanish. Keep code, public documentation, identifiers and commit messages in English.
 - The maintainer is new to Rust: explain consequential tradeoffs briefly; do not assume Rust knowledge.
 
@@ -26,7 +26,7 @@
 
 - Run `sh scripts/doctor.sh` to inspect prerequisites. It does not install tools, start login flows, open windows, or display credential values.
 - For diagnostic script changes, run `sh scripts/test-doctor.sh`; it uses command stubs and requires no credentials or network. A discoverable Metal executable is not proof that its optional toolchain can execute.
-- No Cargo workspace exists yet. Do not report Rust/UI tests as passing until there is actual application code and the checks have run.
+- A Cargo workspace now contains the UI-independent core. Report test results only after running the corresponding checks.
 - Once a Cargo workspace exists, run `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, and `cargo test --workspace --locked`.
 - Pin the Rust version when bootstrapping the app, commit Cargo.lock, and choose a compatible GPUI Kit release/revision. Skills' pinned revision is NOT a dependency selection.
 - Test URL escaping, configuration validation, filtering and keyboard state transitions without launching real URLs. Never interpolate configuration into shell commands.

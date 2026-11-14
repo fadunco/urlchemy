@@ -1,0 +1,174 @@
+{
+  "status": "Contract examples approved on 2026-11-14, not executed engine tests.",
+  "journey_format": {
+    "answers": "Ordered confirmations along the selected traversal.",
+    "choice": "Zero-based option index at the current select step.",
+    "text": "Literal input confirmed without an explicitly selected suggestion.",
+    "suggestion": "Zero-based explicitly selected suggestion index at the current input step."
+  },
+  "valid_files": ["fixed.yaml", "linear.yaml", "common.yaml", "branching.yaml"],
+  "journeys": [
+    {
+      "name": "fixed destination with base prefix and trailing slash",
+      "file": "fixed.yaml",
+      "flow": "fixed",
+      "answers": [],
+      "url": "https://status.example.com/company/overview?view=summary"
+    },
+    {
+      "name": "canonical base without inputs or template text",
+      "file": "fixed.yaml",
+      "flow": "base-only",
+      "answers": [],
+      "url": "https://example.com/"
+    },
+    {
+      "name": "query-only destination preserves base prefix",
+      "file": "fixed.yaml",
+      "flow": "query-only",
+      "answers": [],
+      "url": "https://example.com/company?view=summary"
+    },
+    {
+      "name": "capture order differs from URL order",
+      "file": "linear.yaml",
+      "flow": "open-application",
+      "answers": [{"suggestion": 0}, {"text": "accounts"}],
+      "url": "https://idp.example.com/company/engineering/application/accounts/jobs?owner=accounts&owner=backup"
+    },
+    {
+      "name": "non-capturing selection completes through its first terminal option",
+      "file": "fixed.yaml",
+      "flow": "terminal-option",
+      "answers": [{"choice": 0}],
+      "url": "https://status.example.com/company/overview"
+    },
+    {
+      "name": "non-capturing selection completes through its second terminal option",
+      "file": "fixed.yaml",
+      "flow": "terminal-option",
+      "answers": [{"choice": 1}],
+      "url": "https://status.example.com/company/incidents"
+    },
+    {
+      "name": "literal text is not the visible suggestion label's stored value",
+      "file": "linear.yaml",
+      "flow": "open-application",
+      "answers": [{"text": "Jobs"}, {"text": "accounts"}],
+      "url": "https://idp.example.com/company/engineering/application/accounts/Jobs?owner=accounts&owner=backup"
+    },
+    {
+      "name": "Unicode and reserved characters in path and query",
+      "file": "linear.yaml",
+      "flow": "open-application",
+      "answers": [{"text": "jobs"}, {"text": "café/ops & SRE"}],
+      "url": "https://idp.example.com/company/engineering/application/caf%C3%A9%2Fops%20%26%20SRE/jobs?owner=caf%C3%A9%2Fops%20%26%20SRE&owner=backup"
+    },
+    {
+      "name": "surrounding spaces are preserved",
+      "file": "linear.yaml",
+      "flow": "open-application",
+      "answers": [{"text": "jobs"}, {"text": " accounts "}],
+      "url": "https://idp.example.com/company/engineering/application/%20accounts%20/jobs?owner=%20accounts%20&owner=backup"
+    },
+    {
+      "name": "percent signs are data, not pre-encoded URL text",
+      "file": "linear.yaml",
+      "flow": "open-application",
+      "answers": [{"text": "jobs"}, {"text": "%2F"}],
+      "url": "https://idp.example.com/company/engineering/application/%252F/jobs?owner=%252F&owner=backup"
+    },
+    {
+      "name": "common continuation with staging",
+      "file": "common.yaml",
+      "flow": "environment-application",
+      "answers": [{"choice": 0}, {"text": "accounts"}],
+      "url": "https://idp.example.com/company/staging/application/accounts"
+    },
+    {
+      "name": "common continuation with production",
+      "file": "common.yaml",
+      "flow": "environment-application",
+      "answers": [{"choice": 1}, {"text": "accounts"}],
+      "url": "https://idp.example.com/company/production/application/accounts"
+    },
+    {
+      "name": "accepted HTTP Traffic branch",
+      "file": "branching.yaml",
+      "flow": "open-dashboard",
+      "answers": [{"choice": 0}, {"text": "accounts"}, {"text": "billing"}],
+      "url": "https://app.datadog.com/company/8c21-http?from=accounts&to=billing"
+    },
+    {
+      "name": "accepted User Activity branch",
+      "file": "branching.yaml",
+      "flow": "open-dashboard",
+      "answers": [{"choice": 1}, {"text": "alice"}],
+      "url": "https://app.datadog.com/company/9d32-users?userID=alice"
+    },
+    {
+      "name": "reserved characters remain within one query value",
+      "file": "branching.yaml",
+      "flow": "open-dashboard",
+      "answers": [{"choice": 0}, {"text": "accounts & billing"}, {"text": "billing"}],
+      "url": "https://app.datadog.com/company/8c21-http?from=accounts%20%26%20billing&to=billing"
+    },
+    {
+      "name": "dot text and plus sign remain query data",
+      "file": "branching.yaml",
+      "flow": "open-dashboard",
+      "answers": [{"choice": 0}, {"text": ".."}, {"text": "A+B"}],
+      "url": "https://app.datadog.com/company/8c21-http?from=..&to=A%2BB"
+    }
+  ],
+  "runtime_rejections": [
+    {
+      "name": "empty mandatory input",
+      "file": "linear.yaml",
+      "flow": "open-application",
+      "answers": [{"text": ""}],
+      "code": "E_INPUT_REQUIRED",
+      "state": "Keep the first input draft and empty committed history."
+    },
+    {
+      "name": "whitespace-only mandatory input",
+      "file": "linear.yaml",
+      "flow": "open-application",
+      "answers": [{"text": " \u00a0 "}],
+      "code": "E_INPUT_REQUIRED",
+      "state": "Keep the first input draft and empty committed history."
+    },
+    {
+      "name": "control character in input",
+      "file": "linear.yaml",
+      "flow": "open-application",
+      "answers": [{"text": "jobs\narchive"}],
+      "code": "E_INPUT_CONTROL",
+      "state": "Keep the first input draft and empty committed history."
+    },
+    {
+      "name": "complete dot path segment",
+      "file": "linear.yaml",
+      "flow": "open-application",
+      "answers": [{"text": "jobs"}, {"text": ".."}],
+      "code": "E_RESOLVE_DOT_SEGMENT",
+      "state": "Retain both committed answers at DestinationError. Emit no URL."
+    }
+  ],
+  "invalid_files": [
+    {"file": "invalid-unknown-field.yaml", "code": "E_SCHEMA_UNKNOWN_FIELD", "pointer": "/navigation/0/flow/baseUrl", "line": 5, "column": 7},
+    {"file": "invalid-string-type.yaml", "code": "E_SCHEMA_TYPE", "pointer": "/navigation/0/flow/start/select/options/0/value", "line": 12, "column": 22},
+    {"file": "invalid-missing-continuation.yaml", "code": "E_CONTINUATION", "pointer": "/navigation/0/flow/start/select/options/0/next", "line": 10, "column": 15},
+    {"file": "invalid-mixed-continuation.yaml", "code": "E_CONTINUATION", "pointer": "/navigation/0/flow/start/select/options/0/next", "line": 11, "column": 15},
+    {"file": "invalid-unavailable-capture.yaml", "code": "E_CAPTURE_UNAVAILABLE", "pointer": "/navigation/0/flow/start/input/next/destination/template", "line": 12, "column": 25},
+    {"file": "invalid-duplicate-capture.yaml", "code": "E_CAPTURE_DUPLICATE", "pointer": "/navigation/0/flow/start/input/next/input/capture", "line": 13, "column": 24},
+    {"file": "invalid-base.yaml", "code": "E_BASE_URL", "pointer": "/navigation/0/flow/baseURL", "line": 5, "column": 16},
+    {"file": "invalid-template.yaml", "code": "E_TEMPLATE_SYNTAX", "pointer": "/navigation/0/flow/start/input/next/destination/template", "line": 12, "column": 25},
+    {"file": "invalid-duplicate-key.yaml", "code": "E_YAML_DUPLICATE_KEY", "pointer": "/navigation/0/flow/id", "line": 4, "column": 7},
+    {"file": "invalid-yaml.yaml", "code": "E_YAML_SYNTAX", "pointer": "", "line": 2, "column": 1},
+    {"file": "invalid-noncapturing-value.yaml", "code": "E_CAPTURE_VALUE", "pointer": "/navigation/0/flow/start/select/options/0/value", "line": 11, "column": 22},
+    {"file": "invalid-empty-options.yaml", "code": "E_SCHEMA_EMPTY_OPTIONS", "pointer": "/navigation/0/flow/start/select/options", "line": 9, "column": 20},
+    {"file": "invalid-anchor.yaml", "code": "E_YAML_FEATURE", "pointer": "/navigation", "line": 1, "column": 13},
+    {"file": "invalid-null.yaml", "code": "E_SCHEMA_TYPE", "pointer": "/navigation/0/flow/emoji", "line": 5, "column": 14}
+  ]
+}

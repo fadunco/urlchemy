@@ -1,0 +1,8 @@
+navigation:
+  - flow:
+      id: invalid-base
+      label: Example
+      baseURL: javascript:alert(1)
+      start:
+        destination:
+          template: "/"

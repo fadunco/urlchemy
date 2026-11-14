@@ -1,0 +1,46 @@
+navigation:
+  - folder:
+      label: Tools
+      emoji: "🧰"
+      alias: tools
+      children:
+        - flow:
+            id: fixed
+            label: Service status
+            emoji: "🟢"
+            alias: status
+            direct_alias: service-status
+            baseURL: https://status.example.com/company/
+            start:
+              destination:
+                template: "/overview?view=summary"
+  - flow:
+      id: base-only
+      label: Home
+      baseURL: HTTPS://EXAMPLE.COM:443
+      start:
+        destination:
+          template: ""
+  - flow:
+      id: query-only
+      label: Summary
+      baseURL: https://example.com/company
+      start:
+        destination:
+          template: "?view=summary"
+  - flow:
+      id: terminal-option
+      label: Choose status page
+      baseURL: https://status.example.com/company
+      start:
+        select:
+          label: Page
+          options:
+            - label: Overview
+              next:
+                destination:
+                  template: "/overview"
+            - label: Incidents
+              next:
+                destination:
+                  template: "/incidents"

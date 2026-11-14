@@ -1,0 +1,9 @@
+navigation:
+  - flow:
+      id: first
+      id: second
+      label: Example
+      baseURL: https://example.com
+      start:
+        destination:
+          template: "/"

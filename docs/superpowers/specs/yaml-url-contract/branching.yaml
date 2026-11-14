@@ -1,0 +1,43 @@
+navigation:
+  - folder:
+      label: Datadog
+      alias: dd
+      children:
+        - flow:
+            id: open-dashboard
+            label: Open dashboard
+            alias: dashboards
+            direct_alias: open-dd
+            baseURL: https://app.datadog.com/company
+            start:
+              select:
+                label: Dashboard
+                capture: dashboard_id
+                options:
+                  - label: HTTP Traffic
+                    value: 8c21-http
+                    next:
+                      input:
+                        label: Source application
+                        capture: source_app
+                        suggestions:
+                          - label: Accounts
+                            value: accounts
+                          - label: Billing
+                            value: billing
+                        next:
+                          input:
+                            label: Destination application
+                            capture: destination_app
+                            next:
+                              destination:
+                                template: "/{dashboard_id}?from={source_app}&to={destination_app}"
+                  - label: User Activity
+                    value: 9d32-users
+                    next:
+                      input:
+                        label: User identifier
+                        capture: user_id
+                        next:
+                          destination:
+                            template: "/{dashboard_id}?userID={user_id}"

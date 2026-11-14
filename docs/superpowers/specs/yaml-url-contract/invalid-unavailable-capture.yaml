@@ -1,0 +1,12 @@
+navigation:
+  - flow:
+      id: unavailable-capture
+      label: Example
+      baseURL: https://example.com
+      start:
+        input:
+          label: Source application
+          capture: source_app
+          next:
+            destination:
+              template: "/{user_id}"

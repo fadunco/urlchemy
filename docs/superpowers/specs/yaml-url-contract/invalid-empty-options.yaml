@@ -1,0 +1,12 @@
+navigation:
+  - flow:
+      id: empty-options
+      label: Example
+      baseURL: https://example.com
+      start:
+        select:
+          label: Destination
+          options: []
+          next:
+            destination:
+              template: "/overview"

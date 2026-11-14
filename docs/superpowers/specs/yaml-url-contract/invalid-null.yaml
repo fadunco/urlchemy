@@ -1,0 +1,9 @@
+navigation:
+  - flow:
+      id: null-emoji
+      label: Example
+      emoji: null
+      baseURL: https://example.com
+      start:
+        destination:
+          template: "/"

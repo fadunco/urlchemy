@@ -4,9 +4,11 @@ This roadmap proposes the sequence from the agreed [MVP product definition](docs
 to a usable macOS application. It is not an executable implementation plan or
 authorization to scaffold, install dependencies, commit, publish, or delegate.
 
-**Current position:** MVP functional scope and acceptance criteria agreed; an
-illustrative YAML representation exists. No Cargo workspace or production
-application exists yet. The next milestone is domain and execution design.
+**Current position:** milestones 1–2 have approved designs. Milestone 3 now has a
+tested UI-independent Rust core and a pinned Cargo workspace. The
+[implementation plan and execution record](docs/superpowers/plans/2026-11-14-ui-independent-core.md)
+record its verification. No native launcher exists yet. The next milestone is
+the interaction contract and low-fidelity UX.
 
 ## How to use this roadmap
 
