@@ -240,8 +240,18 @@ impl Converter {
 
 pub(super) fn deserialize(document: YamlDocument) -> Result<RawConfig, Diagnostics> {
     let mut c = Converter { errors: Vec::new() };
+    let mut shortcuts = None;
     let navigation = document.root.as_ref().and_then(|root| {
-        let pairs = c.mapping(root, &["navigation"])?;
+        let pairs = c.mapping(root, &["navigation", "shortcuts"])?;
+        shortcuts = c
+            .get(pairs, "shortcuts", &root.origin, false)
+            .and_then(|node| {
+                let pairs = c.mapping(node, &["invoke", "launch"])?;
+                Some(RawShortcuts {
+                    invoke: c.text(pairs, "invoke", &node.origin, false),
+                    launch: c.text(pairs, "launch", &node.origin, false),
+                })
+            });
         c.get(pairs, "navigation", &root.origin, true)
             .and_then(|n| c.sequence(n))
             .map(|ns| ns.iter().filter_map(|n| c.entry(n)).collect())
@@ -253,6 +263,7 @@ pub(super) fn deserialize(document: YamlDocument) -> Result<RawConfig, Diagnosti
         Ok(RawConfig {
             origin: document.origin,
             navigation: navigation.unwrap_or_default(),
+            shortcuts,
         })
     } else {
         Err(Diagnostics::collect(c.errors))

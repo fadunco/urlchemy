@@ -9,6 +9,12 @@ pub(crate) struct Field<T> {
 pub(super) struct RawConfig {
     pub origin: Origin,
     pub navigation: Vec<RawEntry>,
+    pub shortcuts: Option<RawShortcuts>,
+}
+#[derive(Debug)]
+pub(super) struct RawShortcuts {
+    pub invoke: Option<Field<String>>,
+    pub launch: Option<Field<String>>,
 }
 #[derive(Debug)]
 pub(super) enum RawEntry {
