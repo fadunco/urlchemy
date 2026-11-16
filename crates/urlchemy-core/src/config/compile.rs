@@ -2,6 +2,7 @@ use super::raw::*;
 use crate::{
     catalog::*,
     diagnostic::{Diagnostic, Diagnostics, Origin},
+    shortcut::{Shortcut, ShortcutError, ShortcutRole, Shortcuts},
     url::{compile_template, parse_base},
     value::{CaptureName, CapturedValue, TextError, check_text, valid_alias, valid_name},
 };
@@ -20,6 +21,43 @@ struct Compiler {
     origin: Origin,
 }
 impl Compiler {
+    fn shortcuts(&mut self, raw: Option<RawShortcuts>) -> Option<Shortcuts> {
+        let defaults = Shortcuts::default();
+        let Some(raw) = raw else {
+            return Some(defaults);
+        };
+        let mut binding = |field: &Option<Field<String>>, role, default: &Shortcut| match field {
+            None => Some(default.clone()),
+            Some(field) => Shortcut::parse(&field.value, role)
+                .map_err(|error| {
+                    self.error(
+                        match error {
+                            ShortcutError::Syntax => "E_SHORTCUT_SYNTAX",
+                            ShortcutError::Conflict => "E_SHORTCUT_CONFLICT",
+                        },
+                        &field.origin,
+                    );
+                })
+                .ok(),
+        };
+        let invoke = binding(&raw.invoke, ShortcutRole::Invoke, defaults.invoke());
+        let launch = binding(&raw.launch, ShortcutRole::Launch, defaults.launch());
+        Shortcuts::new(invoke?, launch?)
+            .map_err(|_| {
+                let origin = raw
+                    .launch
+                    .as_ref()
+                    .or(raw.invoke.as_ref())
+                    .map(|field| &field.origin)
+                    .unwrap_or(&self.origin);
+                let mut error = Diagnostic::new("E_SHORTCUT_CONFLICT", origin);
+                if let Some(prior) = &raw.invoke {
+                    error = error.related(&prior.origin);
+                }
+                self.errors.push(error);
+            })
+            .ok()
+    }
     fn error(&mut self, code: &'static str, origin: &Origin) {
         self.errors.push(Diagnostic::new(code, origin));
     }
@@ -279,6 +317,7 @@ pub(super) fn compile(raw: RawConfig) -> Result<Catalog, Diagnostics> {
         flows: Vec::new(),
         origin: raw.origin,
     };
+    let shortcuts = c.shortcuts(raw.shortcuts);
     let roots = raw
         .navigation
         .into_iter()
@@ -289,6 +328,7 @@ pub(super) fn compile(raw: RawConfig) -> Result<Catalog, Diagnostics> {
             owner,
             roots,
             flows: c.flows,
+            shortcuts: shortcuts.ok_or_else(|| Diagnostics::collect(c.errors))?,
         })
     } else {
         Err(Diagnostics::collect(c.errors))

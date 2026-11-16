@@ -85,6 +85,12 @@ impl Diagnostic {
             "E_SCHEMA_TYPE" => "Expected the required field type.",
             "E_SCHEMA_REQUIRED" => "Define the required field.",
             "E_SCHEMA_UNKNOWN_FIELD" => "Remove the unknown field.",
+            "E_SHORTCUT_SYNTAX" => {
+                "Define one supported key combination with the required modifiers."
+            }
+            "E_SHORTCUT_CONFLICT" => {
+                "Choose a shortcut that does not conflict with another binding or a protected command."
+            }
             "E_CONTINUATION" => {
                 "Define either one common continuation or a continuation for every option."
             }

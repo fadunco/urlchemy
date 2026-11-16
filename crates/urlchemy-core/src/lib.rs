@@ -6,6 +6,8 @@ pub mod session;
 pub use session::{Action, Outcome, Row, RowId, Session, SessionSnapshot};
 pub mod config;
 mod diagnostic;
+mod shortcut;
+pub use shortcut::{Shortcut, ShortcutKey, ShortcutModifiers, Shortcuts};
 mod url;
 mod value;
 pub use catalog::{Catalog, ChoiceId, Entry, EntryId, FlowId, StepId, SuggestionId};

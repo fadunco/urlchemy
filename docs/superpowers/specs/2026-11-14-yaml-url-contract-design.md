@@ -104,6 +104,10 @@ No serialization version field exists in this initial contract.
 
 ### Root and navigation entries
 
+The approved [shortcut amendment](2026-11-15-shortcuts-framework-design.md)
+adds an optional `shortcuts` root mapping with default values.
+The original schema below records the milestone 2 contract.
+
 | Mapping | Required fields | Optional fields |
 | --- | --- | --- |
 | Root | `navigation`: list of entries | None |

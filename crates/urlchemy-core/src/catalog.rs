@@ -1,4 +1,5 @@
 use crate::{
+    Shortcuts,
     diagnostic::Origin,
     url::{CompiledTemplate, FixedBase},
     value::{CaptureName, CapturedValue},
@@ -24,6 +25,7 @@ pub struct Catalog {
     pub(crate) owner: u64,
     pub(crate) roots: Vec<Entry>,
     pub(crate) flows: Vec<Flow>,
+    pub(crate) shortcuts: Shortcuts,
 }
 #[derive(Debug)]
 pub struct Entry {
@@ -122,6 +124,10 @@ impl Entry {
     }
 }
 impl Catalog {
+    /// Returns configured bindings, not registered system shortcuts.
+    pub fn shortcuts(&self) -> &Shortcuts {
+        &self.shortcuts
+    }
     pub fn roots(&self) -> &[Entry] {
         &self.roots
     }
