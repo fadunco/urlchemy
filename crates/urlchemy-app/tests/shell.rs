@@ -78,6 +78,30 @@ fn registration_failure_keeps_menu_recovery(cx: &mut TestAppContext) {
     assert_eq!(services.paths.get(), 0);
 }
 #[gpui_kit::test]
+fn compact_root_keeps_its_ordinal_after_resize(cx: &mut TestAppContext) {
+    let services = Rc::new(FakeDesktop::default());
+    let _shell = setup(cx, StartupState::Ready(catalog()), services);
+    root(cx);
+    ui(cx, |w, cx| {
+        assert!(w.find_by_label("⌘1").visible());
+        w.press("cmd-1", cx);
+    });
+    ui(cx, |w, _| assert!(w.find_by_label("Section").visible()));
+}
+
+#[gpui_kit::test]
+fn registration_failure_keeps_navigation_ordinals(cx: &mut TestAppContext) {
+    let services = Rc::new(FakeDesktop::default());
+    services.registration_fails.set(true);
+    let _shell = setup(cx, StartupState::Ready(catalog()), services);
+    ui(cx, |w, cx| {
+        assert!(w.find("registration-error").visible());
+        assert!(w.find_by_label("⌘1").visible());
+        w.press("cmd-1", cx);
+    });
+    ui(cx, |w, _| assert!(w.find_by_label("Section").visible()));
+}
+#[gpui_kit::test]
 fn invalid_config_remains_reachable_without_a_binding(cx: &mut TestAppContext) {
     let services = Rc::new(FakeDesktop::default());
     let diagnostics =
@@ -128,7 +152,11 @@ fn open_failure_retry_and_start_over(cx: &mut TestAppContext) {
     finish_flow(cx);
     services.pending.borrow()[0].finish(Err(DesktopError::OpenFailed));
     cx.run_until_parked();
-    ui(cx, |w, cx| w.click("retry", cx));
+    ui(cx, |w, _| {
+        assert!(w.try_find("launcher-field").is_none());
+        assert_eq!(w.find("retry").focused(), Some(true));
+    });
+    ui(cx, |w, cx| w.press("enter", cx));
     assert_eq!(
         services.opened.borrow().as_slice(),
         [
@@ -319,4 +347,27 @@ fn growing_content_stays_inside_the_work_area(cx: &mut TestAppContext) {
         assert!(w.bounds().bottom() <= px(820.) - px(24.));
         assert!(w.find("palette-footer").bounds().bottom() <= w.viewport_size().height);
     });
+}
+
+#[gpui_kit::test]
+fn pending_opening_blocks_duplicate_submission(cx: &mut TestAppContext) {
+    let services = Rc::new(FakeDesktop::default());
+    let _shell = setup(cx, StartupState::Ready(catalog()), services.clone());
+    finish_flow(cx);
+    ui(cx, |w, cx| {
+        assert_eq!(
+            w.find("body-message").label(),
+            Some("Opening in your default browser.")
+        );
+        assert!(w.try_find("launcher-field").is_none());
+        assert!(w.try_find("primary").is_none());
+        assert!(w.find("close").visible());
+        w.click("body-message", cx);
+        w.press("enter", cx);
+    });
+    assert_eq!(services.opened.borrow().len(), 1);
+    menu(cx);
+    services.pending.borrow()[0].finish(Ok(()));
+    cx.run_until_parked();
+    root(cx);
 }

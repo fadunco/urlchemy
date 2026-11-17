@@ -1,0 +1,15 @@
+navigation:
+  - flow:
+      id: invalid-segment
+      label: Invalid segment
+      baseURL: https://example.com
+      start:
+        input:
+          label: Segment
+          capture: segment
+          suggestions:
+            - label: Parent
+              value: ".."
+          next:
+            destination:
+              template: "/{segment}"

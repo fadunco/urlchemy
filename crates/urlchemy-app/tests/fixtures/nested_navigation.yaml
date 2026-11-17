@@ -1,0 +1,21 @@
+navigation:
+  - folder:
+      label: Workspace
+      emoji: "🗂"
+      alias: ws
+      children:
+        - folder:
+            label: Tools
+            emoji: "🧰"
+            alias: tools
+            children:
+              - flow:
+                  id: nested-status
+                  label: Service status
+                  emoji: "🟢"
+                  alias: status
+                  direct_alias: service-status
+                  baseURL: https://status.example.com/company/
+                  start:
+                    destination:
+                      template: "/overview?view=summary"
