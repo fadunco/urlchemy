@@ -4,11 +4,13 @@ This roadmap proposes the sequence from the agreed [MVP product definition](docs
 to a usable macOS application. It is not an executable implementation plan or
 authorization to scaffold, install dependencies, commit, publish, or delegate.
 
-**Current position:** the maintainer approved the designs for milestones 1–4.
-The UI-independent Rust core passes its tests. The [interaction contract](docs/superpowers/specs/2026-11-15-interaction-contract-design.md)
-defines the compact palette. The [shortcut configuration increment](docs/superpowers/plans/2026-11-15-shortcut-configuration.md)
-adds validated settings without native effects. No native launcher exists yet.
-The next milestone is an early native vertical slice with GPUI Kit and macOS shortcuts.
+**Current position:** the native vertical slice is merged into `main` through PR #5.
+The production GPUI Kit palette connects the UI-independent core to configurable macOS shortcuts and browser opening.
+All 74 workspace tests passed again after the merge.
+The maintainer confirmed the basic native journey, Back, dismissal, focus restoration, and browser opening with temporary fixture configuration.
+The [native development guide](docs/native-development.md) records that evidence and the remaining native checks.
+The next milestone completes the agreed MVP journeys.
+The [interaction contract](docs/superpowers/specs/2026-11-15-interaction-contract-design.md) remains the authority for their behavior.
 
 ## How to use this roadmap
 
