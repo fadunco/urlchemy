@@ -42,6 +42,78 @@ This confirms the observed opening behavior, not that the destination page loade
 The harness process then completed without an error in its reported output.
 Shortcut conflicts and the other native scenarios below still require manual checks.
 
+### Journey-first increment
+
+The implementation branch adds headless coverage for fixed destinations, nested navigation, aliases, both dashboard branches, and shared continuations.
+It also covers committed-answer review, suffix invalidation, exact URL escaping, mixed input, focus traversal, and context help.
+Navigation rows show configured emojis and aliases.
+Destination errors and browser-request states no longer display an editable flow.
+Long action labels leave space for footer feedback at smaller window sizes.
+
+The journey-first verification passed 98 tests, including 24 production-view UI tests and 16 shell tests.
+The core and native adapter dependencies did not change.
+The initial journey-first gate compiled the updated native harness without executing it.
+The earlier manual evidence applies to the original vertical slice.
+Later manual checks appear in the native follow-up section below.
+
+### Viewport-numbered navigation
+
+The ordinal increment adds Command+1 through Command+9 for navigation entries.
+Only the first nine fully visible rows receive hints.
+Filtering, scrolling, resizing, and base-font changes recompute the numbers.
+Partial and offscreen rows receive no hint.
+Options and suggestions do not receive navigation shortcuts.
+
+The list now owns a viewport that fits its body region.
+This prevents rows from extending beneath the footer in smaller windows.
+Headless regressions also verify that scrolling can reach the final row.
+
+The workspace suite passes 115 tests, including 35 production-view UI tests and 18 shell tests.
+Four pure tests cover ordinal geometry and stale mappings.
+Eleven UI tests cover ordinal presentation, activation, event boundaries, and the native scroll fixture.
+Painted-text records verify shortcut content without screenshots.
+These records do not establish pixel appearance or VoiceOver behavior.
+
+Verification commands:
+
+```sh
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+cargo test -p urlchemy-core --locked
+cargo test -p urlchemy-app --features native-acceptance --test native_acceptance --no-run --locked
+sh scripts/doctor.sh
+sh scripts/test-doctor.sh
+```
+
+The independent core run passes 39 tests.
+The native harness compiles without execution.
+The diagnostic regressions pass all three cases.
+
+### Native follow-up and reverse traversal
+
+The maintainer authorized fixture launches after the ordinal implementation.
+One run showed a shortcut registration error and a root without an ordinal.
+The subsequent process check found no earlier matching process.
+Two headless shell regressions verify ordinals after compact resizing and registration failure.
+Both pass, but neither reproduces the initial native observation.
+The owner of the shortcut conflict remains unknown.
+
+During a controlled run, the maintainer confirmed root ordinal activation, Back, dismissal, and fresh root invocation.
+The maintainer then reported that Shift+Tab did not move from the input to Close.
+An expanded headless test reproduced this failure.
+The input container and editor registered the same focus handle twice.
+Removing the container's duplicate registration makes the complete forward and reverse cycles pass.
+The workspace suite, formatting, and Clippy pass after this correction.
+The maintainer then confirmed native traversal cycles in both directions with the corrected build.
+The maintainer also confirmed browser opening and focus behavior with a URL that matched the entered values.
+With the 30-folder fixture, the maintainer confirmed native ordinal renumbering after scrolling and filtering.
+Partial rows showed no shortcut, and Command+1 entered the indicated fully visible folder.
+Filtering for `Folder 2` assigned Command+1 to `Folder 20`.
+The maintainer also confirmed that scrolling could reach `Folder 30`.
+These are manual observations, not automated OS acceptance results.
+VoiceOver remains unverified.
+
 ## Configure and launch the app
 
 The following procedure launches a visible native application.
@@ -134,13 +206,33 @@ After permission, check the following with the maintainer:
 
 The supplied native fixture uses default shortcuts.
 Custom confirmation and controlled conflict scenarios need a temporary fixture variant, not a change to private configuration.
+
+### Scroll-only native fixture
+
+Set `URLCHEMY_NATIVE_FIXTURE=scroll` to use 30 empty folders instead of the linear fixture.
+This variant contains no flows or URLs.
+Ordinal activation enters the indicated folder without opening a browser.
+The default fixture remains unchanged when the variable is absent.
+Unknown values stop the harness before application startup.
+
+After permission, close previous URLchemy instances and run:
+
+```sh
+URLCHEMY_NATIVE_FIXTURE=scroll cargo test -p urlchemy-app --features native-acceptance --test native_acceptance --locked
+```
+
+Check numbering after partial-row scrolling and filtering.
+Compare the folder entered through an ordinal with the row that displayed that shortcut.
+Use Back to return to the root.
+Verify that the final folder remains reachable by scrolling.
+
 The compiled harness is not an automated OS acceptance suite.
 Record observed results separately from headless results.
 
 ## Remaining limits
 
-- Viewport-numbered Command+1…9 activation is not implemented. The palette displays no ordinal hints.
-- The full milestone 6 branch-correction and journey matrix remains incomplete.
+- Command+1…9 applies only to navigation entries. Options and suggestions do not have ordinal activation.
+- Non-ordinal journeys have headless coverage. The full native branch-correction matrix remains incomplete.
 - The maintainer confirmed global invocation, typing, Escape dismissal, focus restoration, Back, and a fresh root after dismissal and invocation.
 - Invocation while a session remains open, other focus scenarios, shortcut conflicts, Spaces, fullscreen, and OS IME behavior remain unverified.
 - VoiceOver completeness, screenshot regression baselines, packaging, and signing remain later work.

@@ -119,6 +119,30 @@ impl Launcher {
     pub fn catalog(&self) -> &Catalog {
         &self.catalog
     }
+    pub(crate) fn navigation_entry(
+        &self,
+        id: urlchemy_core::EntryId,
+    ) -> Option<&urlchemy_core::Entry> {
+        if !self.rows.iter().any(|row| row.id() == RowId::Entry(id)) {
+            return None;
+        }
+        self.navigation_entries()?
+            .iter()
+            .find(|entry| entry.id() == id)
+    }
+    pub(crate) fn navigation_entries(&self) -> Option<&[urlchemy_core::Entry]> {
+        let SessionSnapshot::Browsing { folders, .. } = self.snapshot().ok()? else {
+            return None;
+        };
+        let mut entries = self.catalog.roots();
+        for folder in folders {
+            entries = entries
+                .iter()
+                .find(|entry| entry.id() == folder)?
+                .children()?;
+        }
+        Some(entries)
+    }
 
     fn refresh(&mut self, reset: bool) {
         let Ok(snapshot) = self.snapshot() else {
@@ -215,17 +239,7 @@ impl Launcher {
         }
         match id {
             RowId::Entry(id) => {
-                let SessionSnapshot::Browsing { folders, .. } = self.snapshot().ok()? else {
-                    return None;
-                };
-                let mut entries = self.catalog.roots();
-                for folder in folders {
-                    entries = entries
-                        .iter()
-                        .find(|entry| entry.id() == folder)?
-                        .children()?;
-                }
-                let entry = entries.iter().find(|entry| entry.id() == id)?;
+                let entry = self.navigation_entry(id)?;
                 let action = entry
                     .flow()
                     .map(Action::StartFlow)

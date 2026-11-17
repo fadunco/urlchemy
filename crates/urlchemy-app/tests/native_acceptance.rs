@@ -22,10 +22,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = FixtureHome(home);
     let path = urlchemy_core::config::configuration_path(&fixture.0);
     std::fs::create_dir_all(path.parent().ok_or("Missing fixture parent directory")?)?;
-    std::fs::write(
-        &path,
-        include_bytes!("../../../docs/superpowers/specs/yaml-url-contract/linear.yaml"),
-    )?;
+    let source: &[u8] = match std::env::var("URLCHEMY_NATIVE_FIXTURE") {
+        Err(std::env::VarError::NotPresent) => {
+            include_bytes!("../../../docs/superpowers/specs/yaml-url-contract/linear.yaml")
+        }
+        Ok(name) if name == "scroll" => include_bytes!("fixtures/native_scroll.yaml"),
+        _ => {
+            return Err(
+                "Unknown native fixture. Unset URLCHEMY_NATIVE_FIXTURE or set it to scroll.".into(),
+            );
+        }
+    };
+    std::fs::write(&path, source)?;
     let catalog = urlchemy_core::config::load_file(&path)
         .map_err(|_| "Could not load the acceptance fixture.")?;
 

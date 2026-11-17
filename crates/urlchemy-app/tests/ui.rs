@@ -7,18 +7,33 @@ use std::{cell::RefCell, path::Path, rc::Rc};
 use urlchemy_app::{Launcher, PaletteEffect, PaletteEvent, PaletteView};
 use urlchemy_core::config::load_bytes;
 
+#[path = "support/journeys.rs"]
+mod journeys;
+#[path = "support/ordinals.rs"]
+mod ordinals;
+
 struct Harness {
     window: AnyWindowHandle,
     view: Entity<PaletteView>,
     effects: Rc<RefCell<Vec<PaletteEffect>>>,
 }
+struct TestKitInitialized;
+impl gpui_kit::Global for TestKitInitialized {}
 fn setup(cx: &mut TestAppContext, file: &str, prefix: &str) -> Harness {
-    cx.update(gpui_kit::init);
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../docs/superpowers/specs/yaml-url-contract")
         .join(file);
     let bytes = format!("{prefix}{}", std::fs::read_to_string(&path).unwrap());
-    let catalog = Rc::new(load_bytes(&path, bytes.as_bytes()).unwrap());
+    setup_source(cx, &bytes)
+}
+fn setup_source(cx: &mut TestAppContext, source: &str) -> Harness {
+    cx.update(|cx| {
+        if !cx.has_global::<TestKitInitialized>() {
+            gpui_kit::init(cx);
+            cx.set_global(TestKitInitialized);
+        }
+    });
+    let catalog = Rc::new(load_bytes(Path::new("fixture.yaml"), source.as_bytes()).unwrap());
     let (window, view) = cx.update(|cx| {
         gpui_kit::open_window(
             WindowOptions {

@@ -1,14 +1,46 @@
 use crate::{CloseReason, Launcher, PaletteCommand as Cmd, PaletteEffect};
 use gpui_kit::component::{
-    ActiveTheme, Disableable, IndexPath,
+    ActiveTheme, Disableable, ElementExt, IndexPath, Sizable,
     button::{Button, ButtonVariants},
     input::{InputEditsEvent, Textarea, TextareaState},
     list::{List, ListDelegate, ListItem, ListState},
 };
 use gpui_kit::prelude::FluentBuilder;
 use gpui_kit::*;
-use std::{collections::BTreeSet, rc::Rc};
-use urlchemy_core::{EntryId, PrimaryActionHint, Row, SessionSnapshot, StepId};
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, BTreeSet},
+    rc::Rc,
+};
+use urlchemy_core::{EntryId, Row, RowId, SessionSnapshot, StepId};
+
+mod context;
+mod layout;
+mod ordinal_row;
+mod ordinals;
+use ordinal_row::{OrdinalList, OrdinalPresentation, OrdinalRow};
+mod presentation;
+use presentation::{PalettePresentation, PaletteSurface, RowDecoration};
+
+fn row_decorations(launcher: &Launcher) -> BTreeMap<EntryId, RowDecoration> {
+    let visible: BTreeSet<_> = launcher
+        .rows()
+        .iter()
+        .filter_map(|row| {
+            let RowId::Entry(id) = row.id() else {
+                return None;
+            };
+            Some(id)
+        })
+        .collect();
+    launcher
+        .navigation_entries()
+        .unwrap_or_default()
+        .iter()
+        .filter(|entry| visible.contains(&entry.id()))
+        .map(|entry| (entry.id(), RowDecoration::from_entry(entry)))
+        .collect()
+}
 
 #[derive(Clone, Debug)]
 pub enum PaletteEvent {
@@ -37,7 +69,7 @@ impl Global for PaletteBindings {}
 pub struct PaletteView {
     launcher: Launcher,
     editor: Entity<TextareaState>,
-    _edits: Subscription,
+    _edits: Option<Subscription>,
     list: Entity<ListState<PaletteListDelegate>>,
     scope: Scope,
     generation: u64,
@@ -47,6 +79,10 @@ pub struct PaletteView {
     primary_focus: FocusHandle,
     back_focus: FocusHandle,
     close_focus: FocusHandle,
+    start_over_focus: FocusHandle,
+    status_focus: FocusHandle,
+    context_help: context::ContextHelp,
+    ordinals: Rc<RefCell<OrdinalPresentation>>,
     measured_height: Option<Pixels>,
 }
 impl EventEmitter<PaletteEvent> for PaletteView {}
@@ -98,7 +134,7 @@ impl PaletteView {
             .and_then(|binding| binding.keystrokes().first())
             .cloned();
         // Scoped suppression leaves raw events available with repeat/composition metadata.
-        for key in ["enter", "up", "down", "escape", "cmd-["]
+        for key in ["enter", "up", "down", "escape", "cmd-[", "tab", "shift-tab"]
             .into_iter()
             .chain(std::iter::once(launch_label.as_str()))
         {
@@ -121,7 +157,7 @@ impl PaletteView {
         let palette = Rc::new(
             KeyBindingContextPredicate::parse("URLchemyPalette").expect("static palette context"),
         );
-        for key in ["escape", "cmd-["] {
+        for key in ["escape", "cmd-[", "tab", "shift-tab"] {
             if cx
                 .global_mut::<PaletteBindings>()
                 .0
@@ -146,6 +182,12 @@ impl PaletteView {
             .and_then(|id| rows.iter().position(|row| row.id() == id))
             .map(IndexPath::new);
         let owner = cx.weak_entity();
+        let ordinals = Rc::new(RefCell::new(OrdinalPresentation::default()));
+        let decorations = row_decorations(&launcher);
+        let empty_message = PalettePresentation::derive(&launcher)
+            .body_message()
+            .unwrap_or("No matches")
+            .to_owned();
         let list = cx.new(|cx| {
             let mut list = ListState::new(
                 PaletteListDelegate {
@@ -153,6 +195,9 @@ impl PaletteView {
                     rows,
                     selected,
                     revision: 0,
+                    decorations,
+                    empty_message,
+                    ordinals: ordinals.clone(),
                 },
                 window,
                 cx,
@@ -161,14 +206,15 @@ impl PaletteView {
             list.set_selected_index(selected, window, cx);
             list
         });
+        ordinals.borrow_mut().scroll = list.read(cx).scroll_handle().clone();
         let current = launcher
             .snapshot()
             .map(|snapshot| scope(&snapshot))
             .unwrap_or(Scope::Other);
-        Self {
+        let mut view = Self {
             launcher,
             editor,
-            _edits: edits,
+            _edits: Some(edits),
             list,
             scope: current,
             generation: 1,
@@ -178,8 +224,14 @@ impl PaletteView {
             primary_focus: cx.focus_handle().tab_index(1),
             back_focus: cx.focus_handle().tab_index(2),
             close_focus: cx.focus_handle().tab_index(3),
+            start_over_focus: cx.focus_handle().tab_index(2),
+            status_focus: cx.focus_handle(),
+            context_help: context::ContextHelp::default(),
+            ordinals,
             measured_height: None,
-        }
+        };
+        view.sync_context(window, cx);
+        view
     }
     /// The actual editor entity, shared with focus and input-handler integrations.
     pub fn editor(&self) -> Entity<TextareaState> {
@@ -189,6 +241,7 @@ impl PaletteView {
         self.launcher.invocation()
     }
     pub fn dispatch(&mut self, command: Cmd, window: &mut Window, cx: &mut Context<Self>) {
+        self.ordinals.borrow_mut().displayed = None;
         let back = matches!(command, Cmd::Back);
         let refocus = !matches!(command, Cmd::OpenFinished { .. } | Cmd::Dismiss(_));
         let effect = self.launcher.dispatch(command);
@@ -197,7 +250,17 @@ impl PaletteView {
             .snapshot()
             .map(|snapshot| scope(&snapshot))
             .unwrap_or(Scope::Other);
-        if current != self.scope {
+        let editable = PalettePresentation::derive(&self.launcher)
+            .field_label()
+            .is_some();
+        if !editable {
+            self.scope = current;
+            self.generation = self
+                .generation
+                .checked_add(1)
+                .expect("editor generation exhausted");
+            self._edits = None;
+        } else if current != self.scope || self._edits.is_none() {
             self.scope = current;
             self.generation = self
                 .generation
@@ -206,7 +269,7 @@ impl PaletteView {
             let (editor, edits) =
                 Self::make_editor(self.launcher.query(), self.generation, window, cx);
             self.editor = editor;
-            self._edits = edits;
+            self._edits = Some(edits);
             if refocus {
                 self.editor.update(cx, |input, cx| {
                     input.focus(window, cx);
@@ -221,7 +284,13 @@ impl PaletteView {
             });
         }
         self.revision = self.revision.wrapping_add(1);
+        self.ordinals.borrow_mut().revision = self.revision;
         let rows = self.launcher.rows().to_vec();
+        let decorations = row_decorations(&self.launcher);
+        let empty_message = PalettePresentation::derive(&self.launcher)
+            .body_message()
+            .unwrap_or("No matches")
+            .to_owned();
         let selected = self
             .launcher
             .active()
@@ -230,6 +299,8 @@ impl PaletteView {
         self.list.update(cx, |list, cx| {
             list.delegate_mut().rows = rows;
             list.delegate_mut().revision = self.revision;
+            list.delegate_mut().decorations = decorations;
+            list.delegate_mut().empty_message = empty_message;
             list.set_selected_index(selected, window, cx);
             if selected.is_some() {
                 list.scroll_to_selected_item(window, cx);
@@ -243,6 +314,8 @@ impl PaletteView {
             Ok(SessionSnapshot::DestinationError { .. })
         ) {
             self.back_focus.focus(window, cx);
+        } else if self.launcher.is_opening() {
+            self.status_focus.focus(window, cx);
         } else if refocus
             && matches!(
                 self.scope,
@@ -251,6 +324,7 @@ impl PaletteView {
         {
             self.editor.update(cx, |input, cx| input.focus(window, cx));
         }
+        self.sync_context(window, cx);
         cx.notify();
         if let Some(effect) = effect {
             cx.emit(PaletteEvent::Effect(effect));
@@ -259,7 +333,8 @@ impl PaletteView {
     fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let key = &event.keystroke;
         let plain = key.modifiers == Modifiers::default();
-        let editor_focused = self.editor.read(cx).focus_handle(cx).is_focused(window);
+        let editor_focused =
+            self._edits.is_some() && self.editor.read(cx).focus_handle(cx).is_focused(window);
         let launch = editor_focused
             && self
                 .launch
@@ -272,17 +347,45 @@ impl PaletteView {
             && !key.modifiers.alt
             && !key.modifiers.shift;
         let arrow = editor_focused && plain && matches!(key.key.as_str(), "up" | "down");
-        if !launch && !escape && !back && !arrow && !(editor_focused && plain && key.key == "enter")
+        let tab = key.key == "tab"
+            && !key.modifiers.control
+            && !key.modifiers.alt
+            && !key.modifiers.platform;
+        let ordinal = if matches!(self.scope, Scope::Browse(_))
+            && key.modifiers.platform
+            && !key.modifiers.control
+            && !key.modifiers.alt
+            && !key.modifiers.shift
+            && key.key.len() == 1
+        {
+            key.key
+                .parse::<u8>()
+                .ok()
+                .filter(|number| (1..=9).contains(number))
+        } else {
+            None
+        };
+        if !launch
+            && !escape
+            && !back
+            && !arrow
+            && !tab
+            && ordinal.is_none()
+            && !(editor_focused && plain && key.key == "enter")
         {
             return;
         }
         cx.stop_propagation();
-        if event.is_held && (launch || escape || back) {
+        if event.is_held && (launch || escape || back || ordinal.is_some()) {
             return;
         }
-        let composing = self.editor.update(cx, |input, cx| {
-            EntityInputHandler::marked_text_range(input, window, cx).is_some()
-        });
+        if escape && self.dismiss_context_help(window, cx) {
+            return;
+        }
+        let composing = editor_focused
+            && self.editor.update(cx, |input, cx| {
+                EntityInputHandler::marked_text_range(input, window, cx).is_some()
+            });
         if composing {
             if escape {
                 self.editor.update(cx, |input, cx| {
@@ -292,6 +395,35 @@ impl PaletteView {
                 self.editor.update(cx, |input, cx| {
                     EntityInputHandler::unmark_text(input, window, cx)
                 });
+            }
+            return;
+        }
+        if tab {
+            if key.modifiers.shift {
+                window.focus_prev(cx);
+            } else {
+                window.focus_next(cx);
+            }
+            return;
+        }
+        if let Some(number) = ordinal {
+            if self.editor.read(cx).value().as_ref() != self.launcher.query() {
+                return;
+            }
+            let id = {
+                let p = self.ordinals.borrow();
+                p.displayed
+                    .as_ref()
+                    .and_then(|map| map.resolve(number, &p.geometry(window)))
+            };
+            if let Some(id) = id
+                && self
+                    .launcher
+                    .rows()
+                    .iter()
+                    .any(|row| row.id() == RowId::Entry(id))
+            {
+                self.dispatch(Cmd::Activate(RowId::Entry(id)), window, cx);
             }
             return;
         }
@@ -323,9 +455,12 @@ struct PaletteListDelegate {
     rows: Vec<Row>,
     selected: Option<IndexPath>,
     revision: u64,
+    decorations: BTreeMap<EntryId, RowDecoration>,
+    empty_message: String,
+    ordinals: Rc<RefCell<OrdinalPresentation>>,
 }
 impl ListDelegate for PaletteListDelegate {
-    type Item = ListItem;
+    type Item = OrdinalRow;
     fn items_count(&self, _: usize, _: &App) -> usize {
         self.rows.len()
     }
@@ -334,13 +469,77 @@ impl ListDelegate for PaletteListDelegate {
         ix: IndexPath,
         _: &mut Window,
         _: &mut Context<ListState<Self>>,
-    ) -> Option<ListItem> {
+    ) -> Option<OrdinalRow> {
         let row = self.rows.get(ix.row)?;
-        Some(
+        let decoration = match row.id() {
+            RowId::Entry(id) => self.decorations.get(&id),
+            _ => None,
+        };
+        let alias = decoration.and_then(|d| d.alias()).map(str::to_owned);
+        let icon = div()
+            .id("row-icon")
+            .test_support()
+            .w_5()
+            .flex_shrink_0()
+            .flex()
+            .items_center()
+            .justify_center();
+        let icon = if let Some(emoji) = decoration.and_then(|d| d.emoji()).or(row.emoji()) {
+            icon.aria_label(emoji.to_owned())
+                .child(emoji.to_owned())
+                .into_any_element()
+        } else if let Some(decoration) = decoration {
+            let name = if decoration.is_folder() {
+                gpui_kit::assets::IconName::Folder
+            } else {
+                gpui_kit::assets::IconName::File
+            };
+            icon.child(gpui_kit::component::Icon::new(name).small())
+                .into_any_element()
+        } else {
+            icon.into_any_element()
+        };
+        let sample = match row.id() {
+            RowId::Entry(id) => Some((ix.row, id)),
+            _ => None,
+        };
+        Some(OrdinalRow::new(
             ListItem::new(SharedString::from(format!("row:{:?}", row.id())))
                 .accessibility_label(row.label().to_owned())
-                .child(row.label().to_owned()),
-        )
+                .selected(self.selected == Some(ix))
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .w_full()
+                        .child(icon)
+                        .child(
+                            div()
+                                .id("row-label")
+                                .test_support()
+                                .flex_1()
+                                .min_w_0()
+                                .truncate()
+                                .child(row.label().to_owned()),
+                        )
+                        .child(div().w_20().flex_shrink_0().text_sm().when_some(
+                            alias,
+                            |this, alias| {
+                                this.child(
+                                    div()
+                                        .id("row-alias")
+                                        .test_support()
+                                        .aria_label(format!("Alias: {alias}"))
+                                        .truncate()
+                                        .child(alias),
+                                )
+                            },
+                        )),
+                ),
+            sample,
+            self.ordinals.clone(),
+        ))
     }
     fn set_selected_index(
         &mut self,
@@ -373,90 +572,248 @@ impl ListDelegate for PaletteListDelegate {
         _: &mut Window,
         _: &mut Context<ListState<Self>>,
     ) -> impl IntoElement {
-        div().child("No matches")
+        div().child(self.empty_message.clone())
+    }
+}
+
+impl PaletteView {
+    fn render_header(
+        &self,
+        p: &PalettePresentation,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        div()
+            .flex()
+            .items_center()
+            .gap_2()
+            .w_full()
+            .when(p.can_go_back(), |this| {
+                this.child(
+                    Button::new("back")
+                        .ghost()
+                        .label("Back")
+                        .track_focus(&self.back_focus)
+                        .on_click(
+                            cx.listener(|this, _, window, cx| this.dispatch(Cmd::Back, window, cx)),
+                        ),
+                )
+            })
+            .child(self.render_context(window, cx))
+            .child(
+                Button::new("close")
+                    .ghost()
+                    .label("Close")
+                    .track_focus(&self.close_focus)
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.dispatch(Cmd::Dismiss(CloseReason::Explicit), window, cx)
+                    })),
+            )
+            .into_any_element()
+    }
+
+    fn render_question(
+        &self,
+        p: &PalettePresentation,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let label = p.field_label().unwrap_or_default().to_owned();
+        div()
+            .w_full()
+            .flex()
+            .flex_col()
+            .gap_3()
+            .child(div().id("field-label").test_support().child(label.clone()))
+            .child(
+                div()
+                    .id("launcher-field")
+                    .test_support()
+                    .w_full()
+                    .child(Textarea::new(&self.editor).aria_label(label).tab_index(0)),
+            )
+            .when_some(p.error_message(), |this, error| {
+                this.child(
+                    div()
+                        .id("error")
+                        .role(Role::Alert)
+                        .test_support()
+                        .aria_label(error.to_owned())
+                        .text_color(cx.theme().danger)
+                        .child(error.to_owned()),
+                )
+            })
+            .into_any_element()
+    }
+
+    fn render_body(
+        &self,
+        p: &PalettePresentation,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        if p.field_label().is_some() && !self.launcher.rows().is_empty() {
+            return OrdinalList::new(
+                List::new(&self.list).scroll_bounce(false).h_full(),
+                self.ordinals.clone(),
+            )
+            .into_any_element();
+        }
+        div()
+            .w_full()
+            .flex()
+            .flex_col()
+            .gap_2()
+            .when_some(p.body_message(), |this, message| {
+                this.child(
+                    div()
+                        .id("body-message")
+                        .role(Role::Status)
+                        .test_support()
+                        .aria_label(message.to_owned())
+                        .child(message.to_owned()),
+                )
+            })
+            .when(p.field_label().is_none(), |this| {
+                this.when_some(p.error_message(), |this, error| {
+                    this.child(
+                        div()
+                            .id("error")
+                            .role(Role::Alert)
+                            .test_support()
+                            .aria_label(error.to_owned())
+                            .text_color(cx.theme().danger)
+                            .child(error.to_owned()),
+                    )
+                })
+            })
+            .into_any_element()
+    }
+
+    fn render_footer(
+        &self,
+        p: &PalettePresentation,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let failed = p.surface() == PaletteSurface::OpeningFailed;
+        let hint = p.commitment_hint().map(str::to_owned).unwrap_or_else(|| {
+            if p.field_label().is_some() {
+                format!("{} · Confirm", self.launch_label)
+            } else if p.can_go_back() {
+                "Command+[ · Back".into()
+            } else {
+                "Escape · Close".into()
+            }
+        });
+        div()
+            .id("palette-footer")
+            .test_support()
+            .w_full()
+            .min_h(rems(2.))
+            .flex()
+            .items_center()
+            .gap_2()
+            .child(
+                div()
+                    .id("commitment-hint")
+                    .role(Role::Status)
+                    .test_support()
+                    .aria_label(hint.clone())
+                    .flex_1()
+                    .min_w_0()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(hint),
+            )
+            .when(failed, |this| {
+                this.child(
+                    Button::new("start-over")
+                        .label("Start over")
+                        .track_focus(&self.start_over_focus)
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            this.dispatch(Cmd::StartOver, window, cx)
+                        })),
+                )
+            })
+            .when_some(p.primary_label(), |this, label| {
+                this.child(
+                    Button::new(if failed { "retry" } else { "primary" })
+                        .primary()
+                        .label(label.to_owned())
+                        .max_w(relative(0.6))
+                        .track_focus(&self.primary_focus)
+                        .disabled(!p.primary_enabled())
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            let command = if this.launcher.opening_error().is_some() {
+                                Cmd::Retry
+                            } else {
+                                Cmd::Confirm
+                            };
+                            this.dispatch(command, window, cx);
+                        })),
+                )
+            })
+            .into_any_element()
     }
 }
 
 impl Render for PaletteView {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let snapshot = self.launcher.snapshot().ok();
-        let presentation = self.launcher.presentation().ok();
-        let label = match &snapshot {
-            Some(SessionSnapshot::Input { label, .. })
-            | Some(SessionSnapshot::Selection { label, .. }) => label.clone(),
-            _ => "Open a flow".into(),
-        };
-        let context = presentation
-            .as_ref()
-            .map(|p| p.context().join(" / "))
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| "URLchemy".into());
-        let can_back = presentation.as_ref().is_some_and(|p| p.can_go_back());
-        let hint = presentation
-            .as_ref()
-            .map(|p| p.primary_action())
-            .unwrap_or(PrimaryActionHint::Unavailable);
-        let opening_error = self.launcher.opening_error().copied();
-        let primary = if opening_error.is_some() {
-            "Retry"
-        } else {
-            match hint {
-                PrimaryActionHint::OpenFolder => "Open folder",
-                PrimaryActionHint::StartFlow => "Start flow",
-                PrimaryActionHint::OpenUrl => "Open URL",
-                _ => "Continue",
-            }
-        };
-        let enabled = opening_error.is_some()
-            || (!self.launcher.is_opening()
-                && !matches!(
-                    hint,
-                    PrimaryActionHint::Unavailable | PrimaryActionHint::ChooseOption
-                ));
-        let error = self
-            .launcher
-            .error()
-            .map(|e| e.message().to_owned())
-            .or_else(|| opening_error.map(|e| e.to_string()));
-        let editor_focus = self.editor.read(cx).focus_handle(cx);
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let p = PalettePresentation::derive(&self.launcher);
+        let question = p.field_label().is_some();
+        let heights = Rc::new(RefCell::new(layout::RegionHeights::default()));
+        let header_heights = heights.clone();
+        let question_heights = heights.clone();
+        let body_heights = heights.clone();
+        let footer_heights = heights.clone();
         let owner = cx.weak_entity();
         let list = self.list.clone();
+        let ordinals = self.ordinals.clone();
+        let revision = self.revision;
         div()
-            .on_children_prepainted(move |bounds, window, cx| {
-                use gpui_kit::base::ScrollbarHandle;
-                if bounds.len() < 5 {
+            .on_children_prepainted(move |_, window, cx| {
+                let m = heights.borrow();
+                let (Some(header), Some(mut body), Some(footer)) = (m.header, m.body, m.footer)
+                else {
                     return;
+                };
+                let question_height = if question {
+                    let Some(height) = m.question else { return };
+                    Some(height)
+                } else {
+                    None
+                };
+                if question
+                    && !list.read(cx).delegate().rows.is_empty()
+                    && let Some(row_height) = ordinals.borrow().row_height
+                {
+                    body = row_height * list.read(cx).delegate().rows.len() as f32;
                 }
                 let rem = window.rem_size();
-                let state = list.read(cx);
-                let body = if state.delegate().rows.is_empty() {
-                    bounds[3].size.height
-                } else {
-                    state.scroll_handle().content_size().height.min(rem * 24.)
-                };
-                let fixed = bounds
-                    .iter()
-                    .enumerate()
-                    .filter(|(ix, _)| *ix != 3)
-                    .map(|(_, bounds)| bounds.size.height)
-                    .fold(Pixels::ZERO, |sum, height| sum + height);
-                // p_4 is 1rem on each edge. gap_3 is 0.75rem.
-                let height = fixed + body + rem * (2. + 0.75 * (bounds.len() - 1) as f32);
+                let width = window.viewport_size().width;
+                let height = layout::preferred_height(header, question_height, body, footer, rem);
+                let handle = window.window_handle();
                 let owner = owner.clone();
                 cx.defer(move |cx| {
-                    let _ = owner.update(cx, |view, cx| {
-                        if view.measured_height != Some(height) {
-                            view.measured_height = Some(height);
-                            cx.emit(PaletteEvent::ContentHeight {
-                                invocation: view.invocation(),
-                                height,
-                            });
+                    let _ = handle.update(cx, |_, window, cx| {
+                        if window.rem_size() != rem || window.viewport_size().width != width {
+                            return;
                         }
+                        let _ = owner.update(cx, |view, cx| {
+                            if view.revision == revision && view.measured_height != Some(height) {
+                                view.measured_height = Some(height);
+                                cx.emit(PaletteEvent::ContentHeight {
+                                    invocation: view.invocation(),
+                                    height,
+                                });
+                            }
+                        });
                     });
                 });
             })
             .id("palette")
             .key_context("URLchemyPalette")
+            .track_focus(&self.status_focus)
             .capture_key_down(cx.listener(Self::key_down))
             .size_full()
             .bg(cx.theme().background)
@@ -467,103 +824,53 @@ impl Render for PaletteView {
             .gap_3()
             .child(
                 div()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .when(can_back, |this| {
-                        this.child(
-                            Button::new("back")
-                                .ghost()
-                                .label("Back")
-                                .track_focus(&self.back_focus)
-                                .on_click(cx.listener(|this, _, window, cx| {
-                                    this.dispatch(Cmd::Back, window, cx)
-                                })),
-                        )
-                    })
-                    .child(div().flex_1().min_w_0().truncate().child(context))
-                    .child(
-                        Button::new("close")
-                            .ghost()
-                            .label("Close")
-                            .track_focus(&self.close_focus)
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.dispatch(Cmd::Dismiss(CloseReason::Explicit), window, cx)
-                            })),
-                    ),
-            )
-            .child(div().id("field-label").test_support().child(label.clone()))
-            .child(
-                div()
-                    .id("launcher-field")
-                    .test_support()
-                    .track_focus(&editor_focus)
                     .w_full()
-                    .child(Textarea::new(&self.editor).aria_label(label).tab_index(0)),
+                    .flex_shrink_0()
+                    .child(self.render_header(&p, window, cx))
+                    .on_prepaint(move |bounds, _, _| {
+                        header_heights.borrow_mut().header = Some(bounds.size.height)
+                    }),
             )
-            .child(
-                div()
-                    .min_h_0()
-                    .flex_shrink_1()
-                    .max_h(rems(24.))
-                    .h_auto()
-                    .child(
-                        List::new(&self.list)
-                            .scroll_bounce(false)
-                            .max_h(rems(24.))
-                            .h_auto(),
-                    ),
-            )
-            .when_some(error, |this, error| {
+            .when(question, |this| {
                 this.child(
                     div()
-                        .id("error")
-                        .role(Role::Alert)
-                        .test_support()
-                        .aria_label(error.clone())
-                        .text_color(cx.theme().danger)
-                        .child(error),
+                        .w_full()
+                        .flex_shrink_0()
+                        .child(self.render_question(&p, window, cx))
+                        .on_prepaint(move |bounds, _, _| {
+                            question_heights.borrow_mut().question = Some(bounds.size.height)
+                        }),
                 )
             })
             .child(
                 div()
-                    .id("palette-footer")
-                    .test_support()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .child(
-                        div()
-                            .flex_1()
-                            .text_color(cx.theme().muted_foreground)
-                            .child(format!("{} · Confirm", self.launch_label)),
-                    )
-                    .when(opening_error.is_some(), |this| {
-                        this.child(Button::new("start-over").label("Start over").on_click(
-                            cx.listener(|this, _, window, cx| {
-                                this.dispatch(Cmd::StartOver, window, cx)
-                            }),
-                        ))
+                    .on_children_prepainted(move |bounds, _, _| {
+                        body_heights.borrow_mut().body =
+                            bounds.first().map(|bounds| bounds.size.height);
                     })
-                    .child(
-                        Button::new(if opening_error.is_some() {
-                            "retry"
-                        } else {
-                            "primary"
-                        })
-                        .primary()
-                        .label(primary)
-                        .track_focus(&self.primary_focus)
-                        .disabled(!enabled)
-                        .on_click(cx.listener(|this, _, window, cx| {
-                            let command = if this.launcher.opening_error().is_some() {
-                                Cmd::Retry
-                            } else {
-                                Cmd::Confirm
-                            };
-                            this.dispatch(command, window, cx);
-                        })),
-                    ),
+                    .id("palette-body")
+                    .test_support()
+                    .w_full()
+                    .min_h_0()
+                    .flex_shrink_1()
+                    .max_h(rems(24.))
+                    .h_auto()
+                    .when(!question || self.launcher.rows().is_empty(), |this| {
+                        this.overflow_y_scroll()
+                    })
+                    .when(question && !self.launcher.rows().is_empty(), |this| {
+                        this.h(rems(24.)).overflow_hidden()
+                    })
+                    .child(self.render_body(&p, window, cx)),
+            )
+            .child(
+                div()
+                    .w_full()
+                    .flex_shrink_0()
+                    .child(self.render_footer(&p, window, cx))
+                    .on_prepaint(move |bounds, _, _| {
+                        footer_heights.borrow_mut().footer = Some(bounds.size.height)
+                    }),
             )
     }
 }

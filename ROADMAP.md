@@ -130,6 +130,15 @@ limitations are recorded before expanding the full UI.
 
 **Goal:** expose the rest of the tested core through the production interface.
 
+The journey-first implementation now has headless coverage for fixed destinations, branches, common continuations, aliases, and correction.
+The journey-first verification passed 98 tests, including 24 production-view UI tests.
+The native follow-up checks use temporary fixtures and maintainer-reported observations.
+Viewport-numbered navigation now has pure and headless UI coverage.
+The combined workspace suite passes 115 tests, including 35 production-view UI tests.
+The maintainer confirmed basic native ordinal navigation.
+The maintainer also confirmed the corrected native Tab cycle in both directions.
+The maintainer also confirmed native ordinal renumbering, partial-row exclusion, filtering, and final-row access with a temporary fixture.
+
 - Add multilevel folders, folder/flow emojis, scoped aliases and direct access,
   ordinal navigation, suggestions, closed selections, and branches.
 - Complete correction/invalidation, startup diagnostics, and all remaining

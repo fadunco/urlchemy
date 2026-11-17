@@ -1,0 +1,25 @@
+navigation:
+  - flow:
+      id: common-review
+      label: Review environment
+      baseURL: https://review.example.com
+      start:
+        select:
+          label: Environment
+          capture: environment
+          options:
+            - label: Staging
+              value: staging
+            - label: Production
+              value: production
+          next:
+            input:
+              label: Application
+              capture: application
+              next:
+                input:
+                  label: Review
+                  capture: review
+                  next:
+                    destination:
+                      template: "/{environment}/application/{application}?review={review}"
