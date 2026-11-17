@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/urlchemy-core"]
+members = ["crates/urlchemy-core", "crates/urlchemy-app"]
 resolver = "3"
 
 [workspace.package]
