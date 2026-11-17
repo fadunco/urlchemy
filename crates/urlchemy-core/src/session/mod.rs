@@ -1,5 +1,7 @@
 mod history;
 mod navigation;
+mod presentation;
+pub use presentation::{PrimaryActionHint, SessionPresentation};
 
 use crate::{
     Catalog, ChoiceId, Diagnostic, EntryId, FlowId, ResolvedUrl, StepId, SuggestionId,

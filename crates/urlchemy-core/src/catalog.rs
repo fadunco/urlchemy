@@ -99,6 +99,9 @@ pub(crate) struct Suggestion {
 }
 
 impl Entry {
+    pub fn alias(&self) -> Option<&str> {
+        self.presentation.alias.as_deref()
+    }
     pub fn id(&self) -> EntryId {
         self.id
     }

@@ -7,7 +7,7 @@ use crate::{
 };
 use std::collections::BTreeMap;
 
-fn trace<'a>(
+pub(super) fn trace<'a>(
     catalog: &'a Catalog,
     run: &Run,
     mut visit: impl FnMut(&Step, &Answer),

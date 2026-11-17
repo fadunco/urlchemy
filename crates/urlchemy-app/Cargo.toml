@@ -1,0 +1,29 @@
+[package]
+name = "urlchemy-app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[features]
+default = []
+native-acceptance = []
+
+[[test]]
+name = "native_acceptance"
+harness = false
+required-features = ["native-acceptance"]
+
+[dependencies]
+urlchemy-core = { path = "../urlchemy-core" }
+gpui-kit = "=0.9.1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+global-hotkey = "=0.10.0"
+objc2 = "=0.6.5"
+objc2-app-kit = { version = "=0.3.2", default-features = false, features = ["std", "NSWorkspace", "NSRunningApplication", "NSScreen", "NSEvent"] }
+objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "NSString", "NSURL", "NSPathUtilities", "NSGeometry"] }
+
+[dev-dependencies]
+gpui-kit = { version = "=0.9.1", features = ["test-support"] }

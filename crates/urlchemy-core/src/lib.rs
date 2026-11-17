@@ -4,6 +4,7 @@ mod catalog;
 pub mod filter;
 pub mod session;
 pub use session::{Action, Outcome, Row, RowId, Session, SessionSnapshot};
+pub use session::{PrimaryActionHint, SessionPresentation};
 pub mod config;
 mod diagnostic;
 mod shortcut;
